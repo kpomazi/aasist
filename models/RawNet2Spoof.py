@@ -203,6 +203,10 @@ class Model(nn.Module):
         )
 
         self.in_channels = d_args["in_channels"]
+
+        self.first_bn = nn.BatchNorm1d(num_features=d_args["filts"][0])
+        self.selu = nn.SELU(inplace=True)
+
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -245,6 +249,15 @@ class Model(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x, Freq_aug=None):
+        nb_samp = x.shape[0]
+        len_seq = x.shape[1]
+        x = x.view(nb_samp, 1, len_seq)
+
+        x = self.Sinc_conv(x)
+        x = F.max_pool1d(torch.abs(x), 3)
+        x = self.first_bn(x)
+        x = self.selu(x)
+
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
