@@ -244,7 +244,7 @@ class Model(nn.Module):
             self.in_channels = out_channels
         return nn.Sequential(*layers)
 
-    def forward(self, x):
+    def forward(self, x, Freq_aug=None):
         out = self.conv1(x)
         out = self.bn1(out)
         out = self.relu(out)
