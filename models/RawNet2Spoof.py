@@ -163,9 +163,111 @@ class Residual_block(nn.Module):
         out += identity
         out = self.mp(out)
         return out
+    
 
+class BasicBlock(nn.Module):
+    def __init__(self, in_channels, out_channels, stride=1):
+        super(BasicBlock, self).__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(out_channels)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(out_channels)
+        
+        self.shortcut = nn.Sequential()
+        if stride != 1 or in_channels != out_channels:
+            self.shortcut = nn.Sequential(
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
+                nn.BatchNorm2d(out_channels)
+            )
 
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out += self.shortcut(x)
+        out = self.relu(out)
+        return out
+    
 class Model(nn.Module):
+    def __init__(self, d_args):
+        super().__init__()
+
+        self.Sinc_conv = SincConv(
+            #device=self.device,
+            out_channels=d_args["filts"][0],
+            kernel_size=d_args["first_conv"],
+            in_channels=d_args["in_channels"],
+        )
+
+        self.in_channels = d_args["in_channels"]
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
+        self.layer1 = self._make_layer(BasicBlock, 64, 2, stride=1)
+        self.layer2 = self._make_layer(BasicBlock, 128, 2, stride=2)
+        self.layer3 = self._make_layer(BasicBlock, 256, 2, stride=2)
+        self.layer4 = self._make_layer(BasicBlock, 512, 2, stride=2)
+        
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+
+        self.bn_before_gru = nn.BatchNorm1d(
+            num_features=d_args["filts"][2][-1])
+        self.gru = nn.GRU(
+            input_size=d_args["filts"][2][-1],
+            hidden_size=d_args["gru_node"],
+            num_layers=d_args["nb_gru_layer"],
+            batch_first=True,
+        )
+
+        self.fc1_gru = nn.Linear(in_features=d_args["gru_node"],
+                                 out_features=d_args["nb_fc_node"])
+
+        self.fc2_gru = nn.Linear(
+            in_features=d_args["nb_fc_node"],
+            out_features=d_args["nb_classes"],
+            bias=True,
+        )
+
+        self.sig = nn.Sigmoid()
+        self.logsoftmax = nn.LogSoftmax(dim=1)
+
+    def _make_layer(self, block, out_channels, num_blocks, stride):
+        strides = [stride] + [1] * (num_blocks - 1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.in_channels, out_channels, stride))
+            self.in_channels = out_channels
+        return nn.Sequential(*layers)
+
+    def forward(self, x):
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+        out = self.maxpool(out)
+        
+        out = self.layer1(out)
+        out = self.layer2(out)
+        out = self.layer3(out)
+        out = self.layer4(out)
+        
+        out = self.avgpool(out)
+        x = self.bn_before_gru(out)
+        x = self.selu(x)
+        x = x.permute(0, 2, 1)  # (batch, filt, time) >> (batch, time, filt)
+        self.gru.flatten_parameters()
+        x, _ = self.gru(x)
+        x = x[:, -1, :]
+        last_hidden = self.fc1_gru(x)
+        x = self.fc2_gru(last_hidden)
+        output = self.logsoftmax(x)
+        return output, last_hidden
+
+class Model2(nn.Module):
     #def __init__(self, d_args, device):
     def __init__(self, d_args):
         super().__init__()
