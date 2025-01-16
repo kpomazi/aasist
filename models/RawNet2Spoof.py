@@ -212,10 +212,15 @@ class Model(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
         
-        self.layer1 = self._make_layer(BasicBlock, 64, 2, stride=1)
-        self.layer2 = self._make_layer(BasicBlock, 128, 2, stride=2)
-        self.layer3 = self._make_layer(BasicBlock, 256, 2, stride=2)
-        self.layer4 = self._make_layer(BasicBlock, 512, 2, stride=2)
+        self.block0 = nn.Sequential(
+            Residual_block(nb_filts=d_args["filts"][1], first=True))
+        self.block1 = nn.Sequential(
+            Residual_block(nb_filts=d_args["filts"][1]))
+        self.block2 = nn.Sequential(
+            Residual_block(nb_filts=d_args["filts"][2]))
+        d_args["filts"][2][0] = d_args["filts"][2][1]
+        self.block3 = nn.Sequential(
+            Residual_block(nb_filts=d_args["filts"][2]))
         
         self.avgpool = nn.AdaptiveAvgPool1d((1, 1))
 
@@ -263,10 +268,10 @@ class Model(nn.Module):
         out = self.relu(out)
         out = self.maxpool(out)
         
-        out = self.layer1(out)
-        out = self.layer2(out)
-        out = self.layer3(out)
-        out = self.layer4(out)
+        out = self.block0(out)
+        out = self.block1(out)
+        out = self.block2(out)
+        out = self.block3(out)
         
         out = self.avgpool(out)
         x = self.bn_before_gru(out)
