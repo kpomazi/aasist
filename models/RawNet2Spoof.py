@@ -206,11 +206,6 @@ class Model(nn.Module):
 
         self.first_bn = nn.BatchNorm1d(num_features=d_args["filts"][0])
         self.selu = nn.SELU(inplace=True)
-
-        self.conv1 = nn.Conv1d(32, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm1d(64)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool1d(kernel_size=3, stride=2, padding=1)
         
         self.block0 = nn.Sequential(
             Residual_block(nb_filts=d_args["filts"][1], first=True))
@@ -262,12 +257,7 @@ class Model(nn.Module):
         x = F.max_pool1d(torch.abs(x), 3)
         x = self.first_bn(x)
         x = self.selu(x)
-
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.relu(out)
-        out = self.maxpool(out)
-        
+      
         out = self.block0(out)
         out = self.block1(out)
         out = self.block2(out)
