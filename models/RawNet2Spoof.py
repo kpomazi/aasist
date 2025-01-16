@@ -217,7 +217,7 @@ class Model(nn.Module):
         self.block3 = nn.Sequential(
             Residual_block(nb_filts=d_args["filts"][2]))
         
-        self.avgpool = nn.AdaptiveAvgPool1d((1, 1))
+        self.avgpool = nn.AdaptiveAvgPool1d(1)
 
         self.bn_before_gru = nn.BatchNorm1d(
             num_features=d_args["filts"][2][-1])
